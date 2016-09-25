@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "sysfunc.h"
+#include "processInfo.h"
 
 int
 sys_fork(void)
@@ -87,4 +88,17 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// TODO IMPLEMNET fill the processInfo table
+int 
+sys_getprocs(void) 
+{
+  // TODO iterate over all cpus and fill in the processInfo table
+  char *proc_info_tbl;
+  if (argptr(0, &proc_info_tbl, NPROC * sizeof(struct ProcessInfo)) < 0)
+    return -1;
+  // pass to function in proc.c
+
+  return 0;
 }
