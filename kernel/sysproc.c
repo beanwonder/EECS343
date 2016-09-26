@@ -61,7 +61,7 @@ sys_sleep(void)
 {
   int n;
   uint ticks0;
-  
+
   if(argint(0, &n) < 0)
     return -1;
   acquire(&tickslock);
@@ -83,7 +83,7 @@ int
 sys_uptime(void)
 {
   uint xticks;
-  
+
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
@@ -91,8 +91,8 @@ sys_uptime(void)
 }
 
 // TODO IMPLEMNET fill the processInfo table
-int 
-sys_getprocs(void) 
+int
+sys_getprocs(void)
 {
   // TODO iterate over all cpus and fill in the processInfo table
   char *proc_info_tbl;
@@ -100,5 +100,5 @@ sys_getprocs(void)
     return -1;
   // pass to function in proc.c
 
-  return 0;
+  return getprocs();
 }
