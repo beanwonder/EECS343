@@ -103,6 +103,7 @@ static int (*syscalls[])(void) = {
 [SYS_wait]    sys_wait,
 [SYS_write]   sys_write,
 [SYS_uptime]  sys_uptime,
+[SYS_getprocs1] sys_getprocs1,
 [SYS_getprocs] sys_getprocs,
 };
 

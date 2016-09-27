@@ -9,6 +9,8 @@ struct pipe;
 struct proc;
 struct spinlock;
 struct stat;
+//
+struct ProcessInfo;
 
 // bio.c
 void            binit(void);
@@ -169,8 +171,9 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 
-// ps.c
-int getprocs(void);
+// PROJECT ADD proc.c
+int getprocs1(void);
+int getprocs(struct ProcessInfo*);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

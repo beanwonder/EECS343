@@ -24,6 +24,7 @@ int sys_wait(void);
 int sys_write(void);
 int sys_uptime(void);
 // struct ProcessInfo processInfoTable[]
+int sys_getprocs1(void);
 int sys_getprocs(void);
 
 #endif // _SYSFUNC_H_
