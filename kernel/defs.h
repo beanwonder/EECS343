@@ -9,7 +9,6 @@ struct pipe;
 struct proc;
 struct spinlock;
 struct stat;
-//
 struct ProcessInfo;
 
 // bio.c
@@ -171,8 +170,7 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 
-// PROJECT ADD proc.c
-int getprocs1(void);
+// ps.c
 int getprocs(struct ProcessInfo*);
 
 // number of elements in fixed-size array

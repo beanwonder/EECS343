@@ -445,42 +445,24 @@ procdump(void)
 }
 
 
-int 
-getprocs1(void)
-{
-  struct proc* p;
-  int counter = 0;
-  acquire(&ptable.lock);
-  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-    if (p->state != UNUSED) { 
-      counter += 1;
-    }
-  }
-  release(&ptable.lock);
-  return counter;
-}
-
 int
-getprocs(struct ProcessInfo pinfotable[])
+getprocs(struct ProcessInfo processInfoTable[NPROC])
 {
 
-    //acquire(&ptable.lock);
-    //release(&ptable.lock);
-    struct proc* p;
-    int counter = 0;
+    int numProcsses = 0;
     acquire(&ptable.lock);
-    // printf(1,"here01\n");
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
-      if(p->state != UNUSED) {
-        pinfotable[counter].pid = p->pid;
-        pinfotable[counter].ppid = p->parent->pid;
-        pinfotable[counter].state = p->state;
-        pinfotable[counter].sz = p->sz;
-        memmove(p->name, pinfotable[counter].name, 16);
-        counter++;
-      }
+    for(struct proc *p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if(p->state != UNUSED){
+            // populate the info table
+            processInfoTable[numProcsses].pid = p->pid;
+            processInfoTable[numProcsses].ppid = p->parent->pid;
+            processInfoTable[numProcsses].state = p->state;
+            processInfoTable[numProcsses].sz = p->sz;
+            safestrcpy(processInfoTable[numProcsses].name, p->name, 16);
+            numProcsses++;
+        }
     }
     release(&ptable.lock);
 
-    return counter;
+    return numProcsses;
 }

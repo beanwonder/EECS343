@@ -90,21 +90,16 @@ sys_uptime(void)
   return xticks;
 }
 
-// TODO IMPLEMNET fill the processInfo table
-
-int 
-sys_getprocs1(void)
-{
-  return getprocs1();
-}
-
 int
 sys_getprocs(void)
 {
-  // TODO iterate over all cpus and fill in the processInfo table
-  char *proc_info_tbl;
-  if (argptr(0, &proc_info_tbl, NPROC * sizeof(struct ProcessInfo)) < 0)
-    return -1;
-  // pass to function in proc.c
-  return 0; // getprocs((struct ProcessInfo*)proc_info_tbl);
+
+    char* processInfoTable;
+    if (argptr(0, &processInfoTable, NPROC * sizeof(struct ProcessInfo)) < 0) {
+        return -1;
+    }
+
+    int numProcessesGotten = getprocs((struct ProcessInfo*) processInfoTable);
+
+    return numProcessesGotten;
 }

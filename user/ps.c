@@ -1,38 +1,48 @@
-/* process id, parent process id, state, size, name
- *	Here are some additional requirements:
-
- * 	Each process should be on a new line.
- *	Each piece of info on a line should be separated by two spaces.
- * 	The parent process id of the first process is meaningless. For this value, print -1.
- * 	The state must be printed as human-readable text in all caps (not an integer value).
- */
-
-
 #include "types.h"
 #include "stat.h"
 #include "user.h"
-#include "processInfo.h"
 #include "param.h"
 
 int main(int argc, char *argv[])
 {
+    // check the number of arguments
 	int stdout = 1;
-	// char *fmt = "%d  %d  %d  %s\n";
 	if (argc > 1) {
 		printf(stdout, "Usage: ps\n");
 		exit();
 	}
-	// struct ProcessInfo procInfoTbl[NPROC];
-	// printf(stdout, "here\n");
-	// goto kernel
-	int num_procs = getprocs1();
-	printf(stdout, "numProcs: %d\n", num_procs);
 
-	/* int i = 0;
-	for (i = 0; i < numProcs; ++i) {
-		printf(stdout, fmt, procInfoTbl[i].ppid, procInfoTbl[i].state, procInfoTbl[i].sz, procInfoTbl[i].name);
-	}
-	*/
+    // make the syscall and populate the process info table
+    struct ProcessInfo processInfoTable[NPROC];
+    int numProcessesGotten = getprocs(processInfoTable);
+
+    char* states[6];
+    states[0] = "UNUSED";
+    states[1] = "EMBRYO";
+    states[2] = "SLEEPING";
+    states[3] = "RUNNABLE";
+    states[4] = "RUNNING";
+    states[5] = "ZOMBIE";
+
+    char *fmt = "%d  %s  %d  %s\n"; // format for printing processes
+    printf(stdout, "PPID  STATE  SIZE  NAME\n");
+    printf(stdout, "-----------------------\n");
+    for (int i = 0; i < numProcessesGotten; i++) {
+
+        // copy the name into a variable
+        char name[16];
+        strcpy(name, processInfoTable[i].name);
+        // if it is the init process then the ppid is going to be -1
+        int ppid = -1;
+        if (strcmp(name, "init") != 0) {
+            ppid = processInfoTable[i].ppid;
+        }
+        // find the specified state from the enum
+        char* state = states[processInfoTable[i].state];
+        int sz = processInfoTable[i].sz;
+    	printf(stdout, fmt, ppid, state, sz, processInfoTable[i].name);
+
+    }
 
 	exit();
 }
