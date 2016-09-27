@@ -24,12 +24,12 @@ int main(int argc, char *argv[])
     states[4] = "RUNNING";
     states[5] = "ZOMBIE";
 
-    char *fmt = "%d  %s  %d  %s\n"; // format for printing processes
-    printf(stdout, "PPID  STATE  SIZE  NAME\n");
+    char *fmt = "%d  %d  %s  %d  %s\n"; // format for printing processes
+    printf(stdout, "PID  PPID  STATE  SIZE  NAME\n");
     printf(stdout, "-----------------------\n");
     int i;
     for (i = 0; i < numProcessesGotten; i++) {
-
+        int pid = processInfoTable[i].pid;
         // copy the name into a variable
         char name[16];
         strcpy(name, processInfoTable[i].name);
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
         // find the specified state from the enum
         char* state = states[processInfoTable[i].state];
         int sz = processInfoTable[i].sz;
-    	printf(stdout, fmt, ppid, state, sz, processInfoTable[i].name);
+    	printf(stdout, fmt, pid, ppid, state, sz, processInfoTable[i].name);
 
     }
 
