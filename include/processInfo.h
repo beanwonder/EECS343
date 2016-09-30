@@ -1,3 +1,6 @@
+#ifndef _PROCESSINFO_H_
+#define _PROCESSINFO_H_
+
 // ProcessInfo struct
 struct ProcessInfo {
   int pid; // process id
@@ -6,3 +9,5 @@ struct ProcessInfo {
   uint sz; // size in bytes
   char name[16]; // name of process
 };
+
+#endif
