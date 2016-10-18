@@ -5,10 +5,34 @@
 #include "mmu.h"
 #include "proc.h"
 #include "elf.h"
+#include "spinlock.h"
+
 
 extern char data[];  // defined in data.S
 
 static pde_t *kpgdir;  // for use in scheduler()
+
+struct {
+    struct spinlock lock;
+    int refcounts[NSHMPG];
+    char *shmemaddr[NSHMPG];
+} shmeminfo;
+
+// init shmem info
+
+void
+initshmeminfo(){
+
+    initlock(&shmeminfo.lock, "shmeminfo");
+
+    acquire(&shmeminfo.lock);
+    int i;
+    for (i = 0; i < NSHMPG; ++i) {
+      shmeminfo.refcounts[i] = 0;
+      shmeminfo.shmemaddr[i] = NULL;
+    }
+    release(&shmeminfo.lock);
+}
 
 // Allocate one page table for the machine for the kernel address
 // space for scheduler processes.
@@ -191,6 +215,9 @@ inituvm(pde_t *pgdir, char *init, uint sz)
 {
   char *mem;
 
+  // initialization of shmeminfo
+  initshmeminfo();
+
   if(sz >= PGSIZE)
     panic("inituvm: more than a page");
   mem = kalloc();
@@ -231,10 +258,17 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   char *mem;
   uint a;
 
-  if(newsz > USERTOP)
+  // TODO >= or > 
+  if(PGSIZE + newsz > SHMEMBOTTOM)
     return 0;
-  if(newsz < oldsz)
+
+  if(newsz <= oldsz)
     return oldsz;
+
+  if (oldsz == 0) {
+    oldsz += PGSIZE;
+    newsz += PGSIZE;
+  }
 
   a = PGROUNDUP(oldsz);
   for(; a < newsz; a += PGSIZE){
@@ -245,10 +279,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       return 0;
     }
     memset(mem, 0, PGSIZE);
-    int perm = PTE_W|PTE_U;
-    if (NULL == a)
-        perm = PTE_W;
-    mappages(pgdir, (char*)a, PGSIZE, PADDR(mem), perm);
+    mappages(pgdir, (char*)a, PGSIZE, PADDR(mem), PTE_W|PTE_U);
   }
   return newsz;
 }
@@ -280,6 +311,137 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   return newsz;
 }
 
+// shared memory functions
+void*
+shmem_access(int page_number)
+{
+
+  void* addr;
+  pde_t *pgdir;
+  void* shva;
+
+  acquire(&shmeminfo.lock);
+
+  pgdir = proc->pgdir;
+
+  shva = (void*)(USERTOP - (PGSIZE * (page_number + 1)));
+
+  int already = proc->shmemused[page_number];
+  if (already == 1) {
+    if (shmeminfo.shmemaddr[page_number] != NULL) {
+      // shva = walkpgdir(pgdir, shmeminfo.shmemaddr[page_number], 0);
+      release(&shmeminfo.lock);
+      return shva;
+    }
+    shva = NULL;
+    goto bad;
+
+  }
+
+  if (shmeminfo.shmemaddr[page_number]) {
+      addr = shmeminfo.shmemaddr[page_number];
+  } else {
+      addr = kalloc();
+      if (addr == 0){
+          shva = NULL;
+          goto bad;
+      }
+      memset(addr, 0, PGSIZE);
+      shmeminfo.shmemaddr[page_number] = addr;
+  }
+
+  mappages(pgdir, (void*)shva, PGSIZE, PADDR(addr), PTE_W|PTE_U);
+
+  shmeminfo.refcounts[page_number]++;
+
+  proc->shmemused[page_number] = 1;
+
+ bad:
+  release(&shmeminfo.lock);
+  return shva;
+}
+
+void
+shmem_free(struct proc *p)
+{
+
+  // pte_t *pte;
+  // uint pa;
+  pde_t *pgdir;
+
+  pgdir = proc->pgdir;
+  if(pgdir == 0)
+    panic("shmem_free: no pgdir");
+
+  acquire(&shmeminfo.lock);
+
+  int i;
+  for(i = 0; i < NSHMPG; i++){
+
+    if (p->shmemused[i]) {
+
+      shmeminfo.refcounts[i]--;
+
+      if (shmeminfo.refcounts[i] == 0) {
+        kfree(shmeminfo.shmemaddr[i]);
+        shmeminfo.shmemaddr[i] = NULL;
+      }
+
+    }
+
+  }
+
+  release(&shmeminfo.lock);
+}
+
+int
+shmem_count(int page_number)
+{
+
+  int refcount;
+  acquire(&shmeminfo.lock);
+  refcount = shmeminfo.refcounts[page_number];
+  release(&shmeminfo.lock);
+
+  return refcount;
+
+}
+
+void
+shmem_fork_child(struct proc *np)
+{
+
+    pte_t *pte;
+    uint pa;
+    int i;
+
+    for(i = SHMEMBOTTOM; i < USERTOP; i += PGSIZE){
+
+      if((pte = walkpgdir(proc->pgdir, (void*)i, 0)) == 0)
+        continue;
+      if(!(*pte & PTE_P))
+        continue;
+      pa = PTE_ADDR(*pte);
+      // if((mem = kalloc()) == 0)
+      //   goto bad;
+
+      // memmove(mem, (char*)pa, PGSIZE);
+      if(mappages(np->pgdir, (void*)i, PGSIZE, pa, PTE_W|PTE_U) < 0)
+        panic("Could not map shared mem in fork");
+    }
+
+    // see if the child should request same pages as parent
+    for(i = 0; i < NSHMPG; i++){
+      np->shmemused[i] = proc->shmemused[i];
+      if(np->shmemused[i]){
+          acquire(&shmeminfo.lock);
+          shmeminfo.refcounts[i]++;
+          release(&shmeminfo.lock);
+      }
+    }
+
+}
+
 // Free a page table and all the physical memory pages
 // in the user part.
 void
@@ -289,7 +451,7 @@ freevm(pde_t *pgdir)
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, USERTOP, 0);
+  deallocuvm(pgdir, SHMEMBOTTOM, 0);
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P)
       kfree((char*)PTE_ADDR(pgdir[i]));
@@ -309,7 +471,7 @@ copyuvm(pde_t *pgdir, uint sz)
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = PGSIZE; i < sz; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void*)i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))
@@ -318,10 +480,7 @@ copyuvm(pde_t *pgdir, uint sz)
     if((mem = kalloc()) == 0)
       goto bad;
     memmove(mem, (char*)pa, PGSIZE);
-    int perm = PTE_W|PTE_U;
-    if (NULL == i)
-        perm = PTE_W;
-    if(mappages(d, (void*)i, PGSIZE, PADDR(mem), perm) < 0)
+    if(mappages(d, (void*)i, PGSIZE, PADDR(mem), PTE_W|PTE_U) < 0)
       goto bad;
   }
   return d;

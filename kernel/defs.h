@@ -169,9 +169,14 @@ pde_t*          copyuvm(pde_t*, uint);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
+// vm.c for shareed memory
+void* 			shmem_access(int page_number);
+void 			shmem_free(struct proc*);
+int 			shmem_count(int page_number);
+void 			shmem_fork_child(struct proc*);
 
 // ps.c
-int getprocs(struct ProcessInfo*);
+int 			getprocs(struct ProcessInfo*);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

@@ -95,6 +95,11 @@ userinit(void)
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
 
+  int i;
+  for (i = 0; i < NSHMPG; ++i) {
+    p->shmemused[i] = 0;
+  }
+
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
@@ -146,6 +151,9 @@ fork(void)
   np->parent = proc;
   *np->tf = *proc->tf;
 
+  // copy shared memory
+  shmem_fork_child(np);
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -171,7 +179,10 @@ exit(void)
 
   if(proc == initproc)
     panic("init exiting");
-
+  
+  // release shared mem when exit
+  shmem_free(proc);
+  
   // Close all open files.
   for(fd = 0; fd < NOFILE; fd++){
     if(proc->ofile[fd]){
