@@ -258,7 +258,7 @@ allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
   char *mem;
   uint a;
 
-  // TODO >= or > 
+  // TODO newsz, oldsz process size not including the invalid first page
   if(PGSIZE + newsz > SHMEMBOTTOM)
     return 0;
 

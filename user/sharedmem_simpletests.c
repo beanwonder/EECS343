@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "param.h"
 
 #define USERTOP 0xA0000
 #define PGSIZE 4096
@@ -187,6 +188,151 @@ beforeRequestingSharedMemory_countReturns0()
   }
 }
 
+
+void
+shmemAccessReturnsNullForInvalidPages()
+{
+
+  printf(1, "Test: illegal args to shmem_access should return NULL\n");
+
+  if (shmem_access(-1) != NULL){
+    printf(1, "shmem_access to -1 shoud return NULL");
+    testFailed();
+  } else if (shmem_access(4) != NULL) {
+    printf(1, "shmem_access to 4 shoud return NULL");
+    testFailed();
+  } else  {
+      testPassed();
+  }
+
+}
+
+void
+shmemCountReturnsNegative1ForInvalidPages()
+{
+    printf(1, "Test: illegal args to shmem_count should return -1\n");
+
+    if ((int) shmem_count(-1) != -1){
+      printf(1, "shmem_access to -1 shoud return -1");
+      testFailed();
+  } else if ((int) shmem_count(4) != -1) {
+      printf(1, "shmem_access to 4 shoud return -1");
+      testFailed();
+    } else  {
+        testPassed();
+    }
+
+}
+
+void requestsAllShmTest() {
+  // extension for the first and second tests
+  printf(1, "test share all the memory and free return");
+  // char* highestPage =       (char*)(USERTOP - PGSIZE);
+  // char* secondHighestPage = (char*)(USERTOP - 2*PGSIZE);
+  // char* thirdHighestPage =  (char*)(USERTOP - 3*PGSIZE);
+  // char* fourthHighestPage = (char*)(USERTOP - 4*PGSIZE);
+  char* shmpages[NSHMPG] = {(char*)(USERTOP - PGSIZE), 
+                         (char*)(USERTOP - 2*PGSIZE), 
+                         (char*)(USERTOP - 3*PGSIZE), 
+                         (char*)(USERTOP - 4*PGSIZE)};
+  int i = 0;
+  for (i=0; i < NSHMPG; ++i) {
+    char* addr = shmem_access(i);
+    if (addr != shmpages[i]) {
+      expectedVersusActualNumeric("share memory virtual addr", (uint)shmpages[i], (uint)addr);
+      testFailed();
+      return;
+    }
+  }
+
+  int pid;
+  int num;
+  pid = fork();
+  if (pid == 0) {
+    for (i=0; i < NSHMPG; ++i) {
+      char* addr = shmem_access(i);
+      if (addr != shmpages[i]) {
+        expectedVersusActualNumeric("share memory virtual addr", (uint)shmpages[i], (uint)addr);
+        testFailed();
+        return;
+      }
+      num = shmem_count(i);
+      if (num != 2) {
+        expectedVersusActualNumeric("share memory reference count", 2, num);
+        testFailed();
+        return;
+      }
+    }
+  } else {
+    wait();
+
+    for (i=0; i < NSHMPG; ++i) {
+      num = shmem_count(i);
+      if (num != 1) {
+        expectedVersusActualNumeric("share memory reference count", 1, num);
+        testFailed();
+        return;
+      }
+    }
+    testPassed();
+  }
+}
+
+void share_single_page_100_times() {
+  printf(1, "share_single_page_100_times");
+  int i = 0;
+  for (i=0; i < 100; ++i) {
+    shmem_access(0);
+    shmem_access(1);
+    shmem_access(2);
+    shmem_access(3);
+  }
+
+  int num;
+  for (i=0; i < NSHMPG; ++i) {
+    num = shmem_count(i);
+    if (num != 1) {
+      testFailed();
+      expectedVersusActualNumeric("share memory reference count", 1, num);
+      return;
+    }
+  }
+  testPassed();
+}
+
+void access_all_share_memory() {
+  printf(1, "test access_all_share_memory\n");
+
+  int i = 0;
+  for (i = 0; i < NSHMPG; ++i) {
+    char* start = shmem_access(i);
+    start[0] = 42;
+    start[PGSIZE-1] = 42;
+  }
+
+  int pid = fork();
+  if (pid == 0) {
+    for (i = 0; i < NSHMPG; ++i) {
+      char* start = shmem_access(i);
+      *start += 1;
+      start[PGSIZE-1] += 1;
+    }
+    exit();
+  } else {
+    wait();
+    for (i = 0; i < NSHMPG; ++i) {
+      char* start = shmem_access(i);
+        if (*start != 43 || start[PGSIZE-1] != 43) {
+          testFailed();
+          expectedVersusActualNumeric("sharedmemo works?", '+', *start);
+          return;
+        }
+    }
+    testPassed();
+  }
+
+}
+
 int
 main(void)
 {
@@ -243,6 +389,42 @@ main(void)
   }
   wait();
 
+  pid = fork();
+  if(pid == 0) {
+      shmemAccessReturnsNullForInvalidPages();
+      exit();
+  }
+  wait();
+
+  // my staff
+  pid = fork();
+  if(pid == 0) {
+      shmemCountReturnsNegative1ForInvalidPages();
+      exit();
+  }
+  wait();
+
+
+  pid = fork();
+  if (pid == 0) {
+    requestsAllShmTest();
+    exit();
+  }
+  wait();
+
+  pid = fork();
+  if (pid == 0) {
+    share_single_page_100_times();
+    exit();
+  }
+  wait();
+
+  pid = fork();
+  if (pid == 0) {
+    access_all_share_memory();
+    exit();
+  }
+  wait();
 
   exit();
 }
